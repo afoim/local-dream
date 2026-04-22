@@ -100,22 +100,15 @@ fun PromptTagSelectorDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(
-                            text = "选择提示词",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "点击即时添加/删除",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = "选择提示词",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                     Row {
                         IconButton(onClick = { isSearchMode = !isSearchMode }) {
                             Icon(Icons.Default.Search, "搜索")
@@ -133,7 +126,7 @@ fun PromptTagSelectorDialog(
                         onValueChange = { searchQuery = it },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
                         placeholder = { Text("搜索提示词...") },
                         singleLine = true,
                         trailingIcon = {
@@ -145,8 +138,6 @@ fun PromptTagSelectorDialog(
                         }
                     )
                 }
-
-                Divider()
 
                 Divider()
 
@@ -267,7 +258,7 @@ private fun CategoryList(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp)
+        contentPadding = PaddingValues(8.dp)
     ) {
         data.categories.forEach { category ->
             item {
@@ -295,7 +286,7 @@ private fun CategoryList(
                     },
                     onTagClick = onTagClick
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
             }
         }
     }
@@ -326,26 +317,27 @@ private fun CategoryItem(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(onClick = onCategoryClick)
-                    .padding(16.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = category.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Icon(
-                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp 
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp
                                   else Icons.Default.KeyboardArrowDown,
-                    contentDescription = null
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
             // 分组列表
             AnimatedVisibility(visible = isExpanded) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     category.groups.forEach { group ->
                         GroupItem(
@@ -355,7 +347,7 @@ private fun CategoryItem(
                             onGroupClick = { onGroupClick(group.name) },
                             onTagClick = onTagClick
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
             }
@@ -386,38 +378,38 @@ private fun GroupItem(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(onClick = onGroupClick)
-                    .padding(12.dp),
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = group.name,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium
                 )
                 Icon(
-                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp 
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp
                                   else Icons.Default.KeyboardArrowDown,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
 
             // 标签列表
             AnimatedVisibility(visible = isExpanded) {
                 Column(
-                    modifier = Modifier.padding(12.dp)
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
-                    // 使用简单的网格布局
+                    // 使用简单的网格布局（每行3个）
                     var currentRow = mutableListOf<PromptTag>()
                     group.tags.forEachIndexed { index, tag ->
                         currentRow.add(tag)
-                        if (currentRow.size == 2 || index == group.tags.lastIndex) {
+                        if (currentRow.size == 3 || index == group.tags.lastIndex) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    .padding(vertical = 1.dp),
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
                             ) {
                                 currentRow.forEach { t ->
                                     TagChip(
@@ -428,7 +420,7 @@ private fun GroupItem(
                                     )
                                 }
                                 // 填充空白
-                                if (currentRow.size == 1) {
+                                repeat(3 - currentRow.size) {
                                     Spacer(modifier = Modifier.weight(1f))
                                 }
                             }
@@ -451,35 +443,31 @@ private fun TagChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    FilterChip(
-        selected = isSelected,
-        onClick = onClick,
-        label = {
-            Text(
-                text = tag.chinese,
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-            )
-        },
-        leadingIcon = {
-            if (isSelected) {
-                Icon(
-                    Icons.Default.Check,
-                    contentDescription = "已选中",
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            } else {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = "添加",
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        },
-        modifier = modifier,
-        border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
-    )
+    Surface(
+        modifier = modifier
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(6.dp),
+        color = if (isSelected)
+            MaterialTheme.colorScheme.primaryContainer
+        else
+            MaterialTheme.colorScheme.surfaceVariant,
+        border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
+    ) {
+        Text(
+            text = tag.chinese,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            color = if (isSelected)
+                MaterialTheme.colorScheme.onPrimaryContainer
+            else
+                MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 3.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+    }
 }
 
 /**
@@ -501,41 +489,33 @@ private fun SearchResultsList(
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp)
+            contentPadding = PaddingValues(8.dp)
         ) {
             items(results) { (tag, path) ->
                 val isSelected = currentTags.contains(tag.english)
-                
+
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp)
+                        .padding(vertical = 2.dp)
                         .clickable { onTagClick(tag) },
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isSelected) 
-                            MaterialTheme.colorScheme.primaryContainer 
-                        else 
+                        containerColor = if (isSelected)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
                             MaterialTheme.colorScheme.surface
                     ),
-                    border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
+                    border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null
                 ) {
                     Row(
-                        modifier = Modifier.padding(12.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = tag.chinese,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            )
-                            Text(
-                                text = tag.english,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = if (isSelected) 
-                                    MaterialTheme.colorScheme.primary 
-                                else 
-                                    MaterialTheme.colorScheme.onSurface
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                             )
                             Text(
                                 text = path,
@@ -543,12 +523,13 @@ private fun SearchResultsList(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        
+
                         if (isSelected) {
                             Icon(
                                 Icons.Default.Check,
                                 contentDescription = "已选中",
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
