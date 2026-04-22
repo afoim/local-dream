@@ -85,12 +85,12 @@ fun PromptTagSelectorDialog(
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.9f),
-            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.surface
         ) {
             Column(
@@ -455,21 +455,11 @@ private fun TagChip(
         selected = isSelected,
         onClick = onClick,
         label = {
-            Column {
-                Text(
-                    text = tag.chinese,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                )
-                Text(
-                    text = tag.english,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (isSelected) 
-                        MaterialTheme.colorScheme.primary 
-                    else 
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                text = tag.chinese,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+            )
         },
         leadingIcon = {
             if (isSelected) {
