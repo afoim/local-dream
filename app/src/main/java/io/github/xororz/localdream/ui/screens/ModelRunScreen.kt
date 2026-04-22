@@ -46,6 +46,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -69,6 +71,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Check
@@ -88,6 +91,8 @@ import androidx.compose.material.icons.filled.Report
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -388,6 +393,25 @@ fun ModelRunScreen(
     val upscalerRepository = remember { UpscalerRepository(context) }
     val upscalerPreferences =
         remember { context.getSharedPreferences("upscaler_prefs", Context.MODE_PRIVATE) }
+
+    // Prompt selector states
+    var showPromptSelector by remember { mutableStateOf(false) }
+    var showNegativePromptSelector by remember { mutableStateOf(false) }
+
+    // 提示词翻译查找表 (english -> chinese)
+    var promptTranslations by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    LaunchedEffect(Unit) {
+        scope.launch(Dispatchers.IO) {
+            val data = io.github.xororz.localdream.data.PromptTagRepository(context).loadPromptData()
+            val map = mutableMapOf<String, String>()
+            data.categories.forEach { c ->
+                c.groups.forEach { g ->
+                    g.tags.forEach { t -> map[t.english] = t.chinese }
+                }
+            }
+            promptTranslations = map
+        }
+    }
 
     fun saveAllFields() {
         saveAllJob?.cancel()
@@ -1473,65 +1497,105 @@ fun ModelRunScreen(
                             )
                         }
 
-                        OutlinedTextField(
-                            value = prompt,
-                            onValueChange = onPromptChange,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(
-                                    interactionSource = interactionSource,
-                                    indication = null
-                                ) { },
-                            label = { Text(stringResource(R.string.image_prompt)) },
-                            maxLines = if (expandedPrompt) Int.MAX_VALUE else 2,
-                            minLines = if (expandedPrompt) 3 else 2,
-                            shape = MaterialTheme.shapes.medium,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                            ),
-                            trailingIcon = {
-                                IconButton(onClick = {
-                                    expandedPrompt = !expandedPrompt
-                                }) {
-                                    Icon(
-                                        if (expandedPrompt) Icons.Default.KeyboardArrowUp
-                                        else Icons.Default.KeyboardArrowDown,
-                                        contentDescription = if (expandedPrompt) "collapse" else "expand"
-                                    )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            OutlinedTextField(
+                                value = prompt,
+                                onValueChange = onPromptChange,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable(
+                                        interactionSource = interactionSource,
+                                        indication = null
+                                    ) { },
+                                label = { Text(stringResource(R.string.image_prompt)) },
+                                maxLines = if (expandedPrompt) Int.MAX_VALUE else 2,
+                                minLines = if (expandedPrompt) 3 else 2,
+                                shape = MaterialTheme.shapes.medium,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                ),
+                                trailingIcon = {
+                                    IconButton(onClick = {
+                                        expandedPrompt = !expandedPrompt
+                                    }) {
+                                        Icon(
+                                            if (expandedPrompt) Icons.Default.KeyboardArrowUp
+                                            else Icons.Default.KeyboardArrowDown,
+                                            contentDescription = if (expandedPrompt) "collapse" else "expand"
+                                        )
+                                    }
                                 }
+                            )
+                            
+                            FilledTonalIconButton(
+                                onClick = { showPromptSelector = true },
+                                modifier = Modifier
+                                    .padding(top = 8.dp)
+                                    .size(48.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = "选择提示词"
+                                )
                             }
-                        )
+                        }
 
-                        OutlinedTextField(
-                            value = negativePrompt,
-                            onValueChange = onNegativePromptChange,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(
-                                    interactionSource = interactionSource,
-                                    indication = null
-                                ) { },
-                            label = { Text(stringResource(R.string.negative_prompt)) },
-                            maxLines = if (expandedNegativePrompt) Int.MAX_VALUE else 2,
-                            minLines = if (expandedNegativePrompt) 3 else 2,
-                            shape = MaterialTheme.shapes.medium,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                            ),
-                            trailingIcon = {
-                                IconButton(onClick = {
-                                    expandedNegativePrompt = !expandedNegativePrompt
-                                }) {
-                                    Icon(
-                                        if (expandedNegativePrompt) Icons.Default.KeyboardArrowUp
-                                        else Icons.Default.KeyboardArrowDown,
-                                        contentDescription = if (expandedNegativePrompt) "collapse" else "expand"
-                                    )
+                        PromptTagsRow(prompt = prompt, onPromptChange = onPromptChange, translations = promptTranslations)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            OutlinedTextField(
+                                value = negativePrompt,
+                                onValueChange = onNegativePromptChange,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable(
+                                        interactionSource = interactionSource,
+                                        indication = null
+                                    ) { },
+                                label = { Text(stringResource(R.string.negative_prompt)) },
+                                maxLines = if (expandedNegativePrompt) Int.MAX_VALUE else 2,
+                                minLines = if (expandedNegativePrompt) 3 else 2,
+                                shape = MaterialTheme.shapes.medium,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                ),
+                                trailingIcon = {
+                                    IconButton(onClick = {
+                                        expandedNegativePrompt = !expandedNegativePrompt
+                                    }) {
+                                        Icon(
+                                            if (expandedNegativePrompt) Icons.Default.KeyboardArrowUp
+                                            else Icons.Default.KeyboardArrowDown,
+                                            contentDescription = if (expandedNegativePrompt) "collapse" else "expand"
+                                        )
+                                    }
                                 }
+                            )
+                            
+                            FilledTonalIconButton(
+                                onClick = { showNegativePromptSelector = true },
+                                modifier = Modifier
+                                    .padding(top = 8.dp)
+                                    .size(48.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = "选择负面提示词"
+                                )
                             }
-                        )
+                        }
+
+                        PromptTagsRow(prompt = negativePrompt, onPromptChange = onNegativePromptChange, translations = promptTranslations)
 
                         Button(
                             onClick = {
@@ -3760,6 +3824,96 @@ fun ModelRunScreen(
                 }
             }
         )
+    }
+
+    // Prompt selector dialogs
+    if (showPromptSelector) {
+        PromptTagSelectorDialog(
+            onDismiss = { showPromptSelector = false },
+            onTagSelected = { newPrompt ->
+                // 对话框已经返回完整的新prompt，直接使用
+                onPromptChange(newPrompt)
+            },
+            currentPrompt = prompt
+        )
+    }
+
+    if (showNegativePromptSelector) {
+        PromptTagSelectorDialog(
+            onDismiss = { showNegativePromptSelector = false },
+            onTagSelected = { newPrompt ->
+                // 对话框已经返回完整的新prompt，直接使用
+                onNegativePromptChange(newPrompt)
+            },
+            currentPrompt = negativePrompt
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PromptTagsRow(
+    prompt: String,
+    onPromptChange: (String) -> Unit,
+    translations: Map<String, String> = emptyMap()
+) {
+    val tags = remember(prompt) {
+        prompt.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    }
+    if (tags.isEmpty()) return
+
+    FlowRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        tags.forEach { tagText ->
+            val zh = translations[tagText]
+            AssistChip(
+                onClick = {
+                    val newPrompt = tags.filterNot { it == tagText }.joinToString(", ")
+                    onPromptChange(newPrompt)
+                },
+                label = {
+                    if (zh != null) {
+                        Column {
+                            Text(
+                                text = zh,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1
+                            )
+                            Text(
+                                text = tagText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+                                maxLines = 1
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = tagText,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1
+                        )
+                    }
+                },
+                trailingIcon = {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "删除",
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    trailingIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            )
+        }
     }
 }
 

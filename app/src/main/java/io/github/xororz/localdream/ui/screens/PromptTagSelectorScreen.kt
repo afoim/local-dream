@@ -1,0 +1,657 @@
+package io.github.xororz.localdream.ui.screens
+
+import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import io.github.xororz.localdream.data.PromptCategory
+import io.github.xororz.localdream.data.PromptData
+import io.github.xororz.localdream.data.PromptGroup
+import io.github.xororz.localdream.data.PromptTag
+import io.github.xororz.localdream.data.PromptTagRepository
+import kotlinx.coroutines.launch
+
+private const val TAG = "PromptTagSelector"
+
+/**
+ * 提示词标签选择器对话框
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PromptTagSelectorDialog(
+    onDismiss: () -> Unit,
+    onTagSelected: (String) -> Unit,  // 每次点击都会调用，传入新的完整prompt
+    currentPrompt: String = ""
+) {
+    Log.d(TAG, "PromptTagSelectorDialog 打开，当前prompt: $currentPrompt")
+    
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val repository = remember { PromptTagRepository(context) }
+    
+    var promptData by remember { mutableStateOf<PromptData?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearchMode by remember { mutableStateOf(false) }
+    
+    // 使用 mutableStateOf 来跟踪当前的 prompt，这样可以响应外部变化
+    var internalPrompt by remember { mutableStateOf(currentPrompt) }
+    
+    // 当外部 currentPrompt 变化时，更新内部状态
+    LaunchedEffect(currentPrompt) {
+        Log.d(TAG, "外部 currentPrompt 变化: '$currentPrompt'")
+        internalPrompt = currentPrompt
+    }
+    
+    // 当前prompt中的标签集合（用于判断是否已存在）
+    val currentTags = remember(internalPrompt) {
+        internalPrompt.split(",")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toSet()
+    }
+    
+    Log.d(TAG, "当前标签: $currentTags")
+
+    // 加载数据
+    LaunchedEffect(Unit) {
+        Log.d(TAG, "开始加载提示词数据")
+        scope.launch {
+            promptData = repository.loadPromptData()
+            isLoading = false
+            Log.d(TAG, "数据加载完成，分类数: ${promptData?.categories?.size ?: 0}")
+        }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.9f),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // 标题栏
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "选择提示词",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "点击即时添加/删除",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Row {
+                        IconButton(onClick = { isSearchMode = !isSearchMode }) {
+                            Icon(Icons.Default.Search, "搜索")
+                        }
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Default.Close, "关闭")
+                        }
+                    }
+                }
+
+                // 搜索框
+                AnimatedVisibility(visible = isSearchMode) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        placeholder = { Text("搜索提示词...") },
+                        singleLine = true,
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(Icons.Default.Close, "清除")
+                                }
+                            }
+                        }
+                    )
+                }
+
+                Divider()
+
+                // 当前已添加的标签列表
+                if (currentTags.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "当前标签 (点击删除)",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "${currentTags.size} 个",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // 使用 LazyColumn 显示标签（每行3个）
+                        val tagsList = currentTags.toList()
+                        val rows = tagsList.chunked(3)
+                        
+                        Column {
+                            rows.forEach { rowTags ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    rowTags.forEach { tagText ->
+                                        AssistChip(
+                                            onClick = {
+                                                Log.d(TAG, "=== 删除标签: $tagText ===")
+                                                val tagList = internalPrompt.split(",")
+                                                    .map { it.trim() }
+                                                    .filter { it.isNotEmpty() }
+                                                    .toMutableList()
+                                                
+                                                tagList.remove(tagText)
+                                                
+                                                val newPrompt = tagList.joinToString(", ")
+                                                Log.d(TAG, "删除后的prompt: '$newPrompt'")
+                                                internalPrompt = newPrompt
+                                                onTagSelected(newPrompt)
+                                            },
+                                            label = { 
+                                                Text(
+                                                    text = tagText,
+                                                    maxLines = 1,
+                                                    style = MaterialTheme.typography.bodySmall
+                                                ) 
+                                            },
+                                            leadingIcon = {
+                                                Icon(
+                                                    Icons.Default.Close,
+                                                    contentDescription = "删除",
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            },
+                                            colors = AssistChipDefaults.assistChipColors(
+                                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                labelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                leadingIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                            ),
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        )
+                                    }
+                                    // 填充空白
+                                    repeat(3 - rowTags.size) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Divider()
+                }
+
+                Divider()
+
+                // 内容区域
+                Box(modifier = Modifier.weight(1f)) {
+                    when {
+                        isLoading -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                        promptData == null -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("加载失败")
+                            }
+                        }
+                        searchQuery.isNotEmpty() -> {
+                            // 搜索结果
+                            val searchResults = remember(searchQuery, promptData) {
+                                repository.searchTags(searchQuery, promptData!!)
+                            }
+                            SearchResultsList(
+                                results = searchResults,
+                                currentTags = currentTags,
+                                onTagClick = { tag ->
+                                    Log.d(TAG, "=== 点击标签: ${tag.english} ===")
+                                    Log.d(TAG, "内部prompt: '$internalPrompt'")
+                                    
+                                    val tagList = internalPrompt.split(",")
+                                        .map { it.trim() }
+                                        .filter { it.isNotEmpty() }
+                                        .toMutableList()
+                                    
+                                    Log.d(TAG, "解析后的标签列表: $tagList")
+                                    Log.d(TAG, "标签是否存在: ${tagList.contains(tag.english)}")
+                                    
+                                    if (tagList.contains(tag.english)) {
+                                        // 已存在，删除
+                                        Log.d(TAG, "删除标签: ${tag.english}")
+                                        tagList.remove(tag.english)
+                                    } else {
+                                        // 不存在，添加到末尾
+                                        Log.d(TAG, "添加标签: ${tag.english}")
+                                        tagList.add(tag.english)
+                                    }
+                                    
+                                    // 立即更新文本框
+                                    val newPrompt = tagList.joinToString(", ")
+                                    Log.d(TAG, "新的prompt: '$newPrompt'")
+                                    internalPrompt = newPrompt  // 更新内部状态
+                                    Log.d(TAG, "=== 调用 onTagSelected ===")
+                                    onTagSelected(newPrompt)
+                                }
+                            )
+                        }
+                        else -> {
+                            // 分类列表
+                            CategoryList(
+                                data = promptData!!,
+                                currentTags = currentTags,
+                                onTagClick = { tag ->
+                                    Log.d(TAG, "=== 点击标签: ${tag.english} ===")
+                                    Log.d(TAG, "内部prompt: '$internalPrompt'")
+                                    
+                                    val tagList = internalPrompt.split(",")
+                                        .map { it.trim() }
+                                        .filter { it.isNotEmpty() }
+                                        .toMutableList()
+                                    
+                                    Log.d(TAG, "解析后的标签列表: $tagList")
+                                    Log.d(TAG, "标签是否存在: ${tagList.contains(tag.english)}")
+                                    
+                                    if (tagList.contains(tag.english)) {
+                                        // 已存在，删除
+                                        Log.d(TAG, "删除标签: ${tag.english}")
+                                        tagList.remove(tag.english)
+                                    } else {
+                                        // 不存在，添加到末尾
+                                        Log.d(TAG, "添加标签: ${tag.english}")
+                                        tagList.add(tag.english)
+                                    }
+                                    
+                                    // 立即更新文本框
+                                    val newPrompt = tagList.joinToString(", ")
+                                    Log.d(TAG, "新的prompt: '$newPrompt'")
+                                    internalPrompt = newPrompt  // 更新内部状态
+                                    Log.d(TAG, "=== 调用 onTagSelected ===")
+                                    onTagSelected(newPrompt)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 分类列表
+ */
+@Composable
+private fun CategoryList(
+    data: PromptData,
+    currentTags: Set<String>,
+    onTagClick: (PromptTag) -> Unit
+) {
+    Log.d(TAG, "CategoryList 渲染，分类数: ${data.categories.size}")
+    
+    var expandedCategory by remember { mutableStateOf<String?>(null) }
+    var expandedGroup by remember { mutableStateOf<String?>(null) }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp)
+    ) {
+        data.categories.forEach { category ->
+            item {
+                CategoryItem(
+                    category = category,
+                    isExpanded = expandedCategory == category.name,
+                    expandedGroup = expandedGroup,
+                    currentTags = currentTags,
+                    onCategoryClick = {
+                        Log.d(TAG, "点击分类: ${category.name}")
+                        expandedCategory = if (expandedCategory == category.name) {
+                            null
+                        } else {
+                            category.name
+                        }
+                        expandedGroup = null
+                    },
+                    onGroupClick = { groupName ->
+                        Log.d(TAG, "点击分组: $groupName")
+                        expandedGroup = if (expandedGroup == groupName) {
+                            null
+                        } else {
+                            groupName
+                        }
+                    },
+                    onTagClick = onTagClick
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+/**
+ * 分类项
+ */
+@Composable
+private fun CategoryItem(
+    category: PromptCategory,
+    isExpanded: Boolean,
+    expandedGroup: String?,
+    currentTags: Set<String>,
+    onCategoryClick: () -> Unit,
+    onGroupClick: (String) -> Unit,
+    onTagClick: (PromptTag) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column {
+            // 分类标题
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onCategoryClick)
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = category.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp 
+                                  else Icons.Default.KeyboardArrowDown,
+                    contentDescription = null
+                )
+            }
+
+            // 分组列表
+            AnimatedVisibility(visible = isExpanded) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    category.groups.forEach { group ->
+                        GroupItem(
+                            group = group,
+                            isExpanded = expandedGroup == group.name,
+                            currentTags = currentTags,
+                            onGroupClick = { onGroupClick(group.name) },
+                            onTagClick = onTagClick
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 分组项
+ */
+@Composable
+private fun GroupItem(
+    group: PromptGroup,
+    isExpanded: Boolean,
+    currentTags: Set<String>,
+    onGroupClick: () -> Unit,
+    onTagClick: (PromptTag) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column {
+            // 分组标题
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onGroupClick)
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = group.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium
+                )
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp 
+                                  else Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // 标签列表
+            AnimatedVisibility(visible = isExpanded) {
+                Column(
+                    modifier = Modifier.padding(12.dp)
+                ) {
+                    // 使用简单的网格布局
+                    var currentRow = mutableListOf<PromptTag>()
+                    group.tags.forEachIndexed { index, tag ->
+                        currentRow.add(tag)
+                        if (currentRow.size == 2 || index == group.tags.lastIndex) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                currentRow.forEach { t ->
+                                    TagChip(
+                                        tag = t,
+                                        isSelected = currentTags.contains(t.english),
+                                        onClick = { onTagClick(t) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                // 填充空白
+                                if (currentRow.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                            currentRow = mutableListOf()
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 标签芯片
+ */
+@Composable
+private fun TagChip(
+    tag: PromptTag,
+    isSelected: Boolean,  // 是否在当前prompt中
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FilterChip(
+        selected = isSelected,
+        onClick = onClick,
+        label = {
+            Column {
+                Text(
+                    text = tag.chinese,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                )
+                Text(
+                    text = tag.english,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isSelected) 
+                        MaterialTheme.colorScheme.primary 
+                    else 
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        leadingIcon = {
+            if (isSelected) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = "已选中",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            } else {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "添加",
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        },
+        modifier = modifier,
+        border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
+    )
+}
+
+/**
+ * 搜索结果列表
+ */
+@Composable
+private fun SearchResultsList(
+    results: List<Pair<PromptTag, String>>,
+    currentTags: Set<String>,
+    onTagClick: (PromptTag) -> Unit
+) {
+    if (results.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("未找到匹配的提示词")
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp)
+        ) {
+            items(results) { (tag, path) ->
+                val isSelected = currentTags.contains(tag.english)
+                
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .clickable { onTagClick(tag) },
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelected) 
+                            MaterialTheme.colorScheme.primaryContainer 
+                        else 
+                            MaterialTheme.colorScheme.surface
+                    ),
+                    border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = tag.chinese,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                            Text(
+                                text = tag.english,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (isSelected) 
+                                    MaterialTheme.colorScheme.primary 
+                                else 
+                                    MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = path,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        
+                        if (isSelected) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = "已选中",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
