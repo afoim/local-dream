@@ -3,6 +3,20 @@
     "name": "人物",
     "groups": [
       {
+        "name": "NSFW",
+        "color": "rgba(255, 123, 2, .4)",
+        "tags": {
+          "nsfw": "工作不宜",
+          "sex": "性爱",
+          "sexy": "性感",
+          "footjpb": "足交",
+          "handjob": "手交",
+          "mouthjob": "口交",
+          "breastjob": "乳交",
+          "cum": "射精"
+        }
+      },
+      {
         "name": "对象",
         "color": "rgba(255, 123, 2, .4)",
         "tags": {
