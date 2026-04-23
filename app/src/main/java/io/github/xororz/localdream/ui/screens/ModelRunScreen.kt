@@ -1644,11 +1644,22 @@ fun ModelRunScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                stringResource(R.string.image_prompt),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Medium
-                            )
+                            val estTokens = remember(prompt) { estimateClipTokens(prompt) }
+                            val over = estTokens > 75
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    stringResource(R.string.image_prompt),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = if (over) "≈$estTokens/75 超出，后续将被忽略" else "≈$estTokens/75",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (over) MaterialTheme.colorScheme.error
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                             FilledTonalIconButton(
                                 onClick = { showPromptSelector = true },
                                 modifier = Modifier.size(40.dp)
@@ -1667,11 +1678,22 @@ fun ModelRunScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                stringResource(R.string.negative_prompt),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Medium
-                            )
+                            val estTokens = remember(negativePrompt) { estimateClipTokens(negativePrompt) }
+                            val over = estTokens > 75
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    stringResource(R.string.negative_prompt),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = if (over) "≈$estTokens/75 超出，后续将被忽略" else "≈$estTokens/75",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (over) MaterialTheme.colorScheme.error
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                             FilledTonalIconButton(
                                 onClick = { showNegativePromptSelector = true },
                                 modifier = Modifier.size(40.dp)
@@ -3764,6 +3786,36 @@ fun ModelRunScreen(
             currentPrompt = negativePrompt
         )
     }
+}
+
+/**
+ * 粗略估算 CLIP token 数量。CLIP 用 BPE，分词大致对应英文"词或词片段"。
+ * 简单启发：去掉权重括号后按非字母数字切词，纯英文词按长度/4+1 估算 BPE 子词数，
+ * 标点和逗号各算 1 token；中文字符每字算 1 token。仅用于 UI 提示，不要求精确。
+ */
+private fun estimateClipTokens(prompt: String): Int {
+    if (prompt.isBlank()) return 0
+    val cleaned = prompt.replace(Regex("[()\\[\\]{}:0-9.]"), " ")
+    var total = 0
+    var i = 0
+    while (i < cleaned.length) {
+        val c = cleaned[i]
+        when {
+            c.isWhitespace() -> i++
+            c == ',' || c == '，' -> { total++; i++ }
+            c.code in 0x4E00..0x9FFF -> { total++; i++ }   // CJK
+            c.isLetter() -> {
+                var j = i
+                while (j < cleaned.length && cleaned[j].isLetter()) j++
+                val len = j - i
+                // BPE 经验：短词 1 token，长词约每 4-5 字符切一段
+                total += if (len <= 4) 1 else (len + 3) / 4
+                i = j
+            }
+            else -> { total++; i++ }
+        }
+    }
+    return total
 }
 
 /**
