@@ -55,24 +55,32 @@ fun PromptTagSelectorDialog(
     var isLoading by remember { mutableStateOf(true) }
     var searchQuery by remember { mutableStateOf("") }
     var isSearchMode by remember { mutableStateOf(false) }
-    
+
     // 使用 mutableStateOf 来跟踪当前的 prompt，这样可以响应外部变化
     var internalPrompt by remember { mutableStateOf(currentPrompt) }
-    
+
     // 当外部 currentPrompt 变化时，更新内部状态
     LaunchedEffect(currentPrompt) {
         Log.d(TAG, "外部 currentPrompt 变化: '$currentPrompt'")
         internalPrompt = currentPrompt
     }
-    
-    // 当前prompt中的标签集合（用于判断是否已存在）
-    val currentTags = remember(internalPrompt) {
-        internalPrompt.split(",")
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .toSet()
+
+    // 含逗号的复合标签（按长度降序），从已加载数据派生，用于切分时优先识别整体
+    val compoundTags = remember(promptData) {
+        promptData?.categories
+            ?.flatMap { it.groups }
+            ?.flatMap { it.tags }
+            ?.map { it.english }
+            ?.filter { it.contains(",") }
+            ?.sortedByDescending { it.length }
+            ?: emptyList()
     }
-    
+
+    // 当前prompt中的标签集合（识别复合标签为整体）
+    val currentTags = remember(internalPrompt, compoundTags) {
+        tokenizePromptForSelector(internalPrompt, compoundTags).toSet()
+    }
+
     Log.d(TAG, "当前标签: $currentTags")
 
     // 加载数据
@@ -139,26 +147,23 @@ fun PromptTagSelectorDialog(
                     )
                 }
 
-                // 自定义标签输入（支持粘贴时按逗号自动分割）
+                // 自定义标签输入（粘贴时按逗号自动分割，但识别复合标签为整体）
                 var customTagInput by remember { mutableStateOf("") }
-                val addCustomTags: () -> Unit = {
-                    val parts = customTagInput.split(",", "，")
-                        .map { it.trim() }
-                        .filter { it.isNotEmpty() }
+                val commitInput: (String) -> Unit = { raw ->
+                    // 用同一个切分器：复合标签（含逗号的已知标签）作为整体保留
+                    val parts = tokenizePromptForSelector(raw, compoundTags)
                     if (parts.isNotEmpty()) {
-                        val existing = internalPrompt.split(",")
-                            .map { it.trim() }
-                            .filter { it.isNotEmpty() }
-                            .toMutableList()
+                        val existing = tokenizePromptForSelector(internalPrompt, compoundTags).toMutableList()
                         parts.forEach { p ->
                             if (!existing.contains(p)) existing.add(p)
                         }
                         val newPrompt = existing.joinToString(", ")
                         internalPrompt = newPrompt
                         onTagSelected(newPrompt)
-                        customTagInput = ""
                     }
+                    customTagInput = ""
                 }
+                val addCustomTags: () -> Unit = { commitInput(customTagInput) }
 
                 Row(
                     modifier = Modifier
@@ -170,24 +175,12 @@ fun PromptTagSelectorDialog(
                     OutlinedTextField(
                         value = customTagInput,
                         onValueChange = { newValue ->
-                            // 粘贴/输入时若包含逗号，自动分割并加入
-                            if (newValue.contains(",") || newValue.contains("，")) {
-                                val parts = newValue.split(",", "，")
-                                    .map { it.trim() }
-                                    .filter { it.isNotEmpty() }
-                                if (parts.isNotEmpty()) {
-                                    val existing = internalPrompt.split(",")
-                                        .map { it.trim() }
-                                        .filter { it.isNotEmpty() }
-                                        .toMutableList()
-                                    parts.forEach { p ->
-                                        if (!existing.contains(p)) existing.add(p)
-                                    }
-                                    val newPrompt = existing.joinToString(", ")
-                                    internalPrompt = newPrompt
-                                    onTagSelected(newPrompt)
-                                }
-                                customTagInput = ""
+                            // 仅当包含逗号且不属于任何已知复合标签的前缀时才自动提交，
+                            // 否则保留输入让用户继续编辑/粘贴完整复合标签
+                            val hasComma = newValue.contains(",") || newValue.contains("，")
+                            val isCompoundPrefix = hasComma && compoundTags.any { it.startsWith(newValue.trim()) }
+                            if (hasComma && !isCompoundPrefix) {
+                                commitInput(newValue)
                             } else {
                                 customTagInput = newValue
                             }
@@ -241,31 +234,14 @@ fun PromptTagSelectorDialog(
                                 currentTags = currentTags,
                                 onTagClick = { tag ->
                                     Log.d(TAG, "=== 点击标签: ${tag.english} ===")
-                                    Log.d(TAG, "内部prompt: '$internalPrompt'")
-                                    
-                                    val tagList = internalPrompt.split(",")
-                                        .map { it.trim() }
-                                        .filter { it.isNotEmpty() }
-                                        .toMutableList()
-                                    
-                                    Log.d(TAG, "解析后的标签列表: $tagList")
-                                    Log.d(TAG, "标签是否存在: ${tagList.contains(tag.english)}")
-                                    
+                                    val tagList = tokenizePromptForSelector(internalPrompt, compoundTags).toMutableList()
                                     if (tagList.contains(tag.english)) {
-                                        // 已存在，删除
-                                        Log.d(TAG, "删除标签: ${tag.english}")
                                         tagList.remove(tag.english)
                                     } else {
-                                        // 不存在，添加到末尾
-                                        Log.d(TAG, "添加标签: ${tag.english}")
                                         tagList.add(tag.english)
                                     }
-                                    
-                                    // 立即更新文本框
                                     val newPrompt = tagList.joinToString(", ")
-                                    Log.d(TAG, "新的prompt: '$newPrompt'")
-                                    internalPrompt = newPrompt  // 更新内部状态
-                                    Log.d(TAG, "=== 调用 onTagSelected ===")
+                                    internalPrompt = newPrompt
                                     onTagSelected(newPrompt)
                                 }
                             )
@@ -277,31 +253,14 @@ fun PromptTagSelectorDialog(
                                 currentTags = currentTags,
                                 onTagClick = { tag ->
                                     Log.d(TAG, "=== 点击标签: ${tag.english} ===")
-                                    Log.d(TAG, "内部prompt: '$internalPrompt'")
-                                    
-                                    val tagList = internalPrompt.split(",")
-                                        .map { it.trim() }
-                                        .filter { it.isNotEmpty() }
-                                        .toMutableList()
-                                    
-                                    Log.d(TAG, "解析后的标签列表: $tagList")
-                                    Log.d(TAG, "标签是否存在: ${tagList.contains(tag.english)}")
-                                    
+                                    val tagList = tokenizePromptForSelector(internalPrompt, compoundTags).toMutableList()
                                     if (tagList.contains(tag.english)) {
-                                        // 已存在，删除
-                                        Log.d(TAG, "删除标签: ${tag.english}")
                                         tagList.remove(tag.english)
                                     } else {
-                                        // 不存在，添加到末尾
-                                        Log.d(TAG, "添加标签: ${tag.english}")
                                         tagList.add(tag.english)
                                     }
-                                    
-                                    // 立即更新文本框
                                     val newPrompt = tagList.joinToString(", ")
-                                    Log.d(TAG, "新的prompt: '$newPrompt'")
-                                    internalPrompt = newPrompt  // 更新内部状态
-                                    Log.d(TAG, "=== 调用 onTagSelected ===")
+                                    internalPrompt = newPrompt
                                     onTagSelected(newPrompt)
                                 }
                             )
@@ -608,4 +567,33 @@ private fun SearchResultsList(
             }
         }
     }
+}
+
+/**
+ * 选择器内部的 prompt 切分（与 ModelRunScreen.tokenizePrompt 同义，复合标签优先）
+ */
+private fun tokenizePromptForSelector(prompt: String, compoundTags: List<String>): List<String> {
+    val result = mutableListOf<String>()
+    var remaining = prompt
+    while (remaining.isNotBlank()) {
+        remaining = remaining.trimStart().trimStart(',', '，').trimStart()
+        if (remaining.isEmpty()) break
+        val matched = compoundTags.firstOrNull { remaining.startsWith(it) }
+        if (matched != null) {
+            result.add(matched)
+            remaining = remaining.substring(matched.length)
+        } else {
+            val commaIdx = remaining.indexOfAny(charArrayOf(',', '，'))
+            if (commaIdx < 0) {
+                val tag = remaining.trim()
+                if (tag.isNotEmpty()) result.add(tag)
+                break
+            } else {
+                val tag = remaining.substring(0, commaIdx).trim()
+                if (tag.isNotEmpty()) result.add(tag)
+                remaining = remaining.substring(commaIdx + 1)
+            }
+        }
+    }
+    return result
 }

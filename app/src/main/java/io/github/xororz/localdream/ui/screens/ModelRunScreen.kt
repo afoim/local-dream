@@ -400,6 +400,8 @@ fun ModelRunScreen(
 
     // 提示词翻译查找表 (english -> chinese)
     var promptTranslations by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    // 含逗号的复合标签集合（用于切分时优先识别整体）
+    var compoundTags by remember { mutableStateOf<List<String>>(emptyList()) }
     LaunchedEffect(Unit) {
         scope.launch(Dispatchers.IO) {
             val data = io.github.xororz.localdream.data.PromptTagRepository(context).loadPromptData()
@@ -410,6 +412,8 @@ fun ModelRunScreen(
                 }
             }
             promptTranslations = map
+            // 按长度降序，匹配时优先取最长
+            compoundTags = map.keys.filter { it.contains(",") }.sortedByDescending { it.length }
         }
     }
 
@@ -1656,7 +1660,7 @@ fun ModelRunScreen(
                             }
                         }
 
-                        PromptTagsRow(prompt = prompt, onPromptChange = onPromptChange, translations = promptTranslations)
+                        PromptTagsRow(prompt = prompt, onPromptChange = onPromptChange, translations = promptTranslations, compoundTags = compoundTags)
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1679,7 +1683,7 @@ fun ModelRunScreen(
                             }
                         }
 
-                        PromptTagsRow(prompt = negativePrompt, onPromptChange = onNegativePromptChange, translations = promptTranslations)
+                        PromptTagsRow(prompt = negativePrompt, onPromptChange = onNegativePromptChange, translations = promptTranslations, compoundTags = compoundTags)
                     }
                 }
             }
@@ -3762,15 +3766,46 @@ fun ModelRunScreen(
     }
 }
 
+/**
+ * 将 prompt 串切成标签列表。优先匹配 compoundTags（含逗号的复合标签整体取走），
+ * 其余按 "," 切分。compoundTags 应按长度降序传入。
+ */
+private fun tokenizePrompt(prompt: String, compoundTags: List<String>): List<String> {
+    val result = mutableListOf<String>()
+    var remaining = prompt
+    while (remaining.isNotBlank()) {
+        remaining = remaining.trimStart().trimStart(',', '，').trimStart()
+        if (remaining.isEmpty()) break
+        val matched = compoundTags.firstOrNull { remaining.startsWith(it) }
+        if (matched != null) {
+            result.add(matched)
+            remaining = remaining.substring(matched.length)
+        } else {
+            val commaIdx = remaining.indexOfAny(charArrayOf(',', '，'))
+            if (commaIdx < 0) {
+                val tag = remaining.trim()
+                if (tag.isNotEmpty()) result.add(tag)
+                break
+            } else {
+                val tag = remaining.substring(0, commaIdx).trim()
+                if (tag.isNotEmpty()) result.add(tag)
+                remaining = remaining.substring(commaIdx + 1)
+            }
+        }
+    }
+    return result
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PromptTagsRow(
     prompt: String,
     onPromptChange: (String) -> Unit,
-    translations: Map<String, String> = emptyMap()
+    translations: Map<String, String> = emptyMap(),
+    compoundTags: List<String> = emptyList()
 ) {
-    val tags = remember(prompt) {
-        prompt.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    val tags = remember(prompt, compoundTags) {
+        tokenizePrompt(prompt, compoundTags)
     }
     if (tags.isEmpty()) return
 
