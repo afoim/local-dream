@@ -139,6 +139,77 @@ fun PromptTagSelectorDialog(
                     )
                 }
 
+                // 自定义标签输入（支持粘贴时按逗号自动分割）
+                var customTagInput by remember { mutableStateOf("") }
+                val addCustomTags: () -> Unit = {
+                    val parts = customTagInput.split(",", "，")
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() }
+                    if (parts.isNotEmpty()) {
+                        val existing = internalPrompt.split(",")
+                            .map { it.trim() }
+                            .filter { it.isNotEmpty() }
+                            .toMutableList()
+                        parts.forEach { p ->
+                            if (!existing.contains(p)) existing.add(p)
+                        }
+                        val newPrompt = existing.joinToString(", ")
+                        internalPrompt = newPrompt
+                        onTagSelected(newPrompt)
+                        customTagInput = ""
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = customTagInput,
+                        onValueChange = { newValue ->
+                            // 粘贴/输入时若包含逗号，自动分割并加入
+                            if (newValue.contains(",") || newValue.contains("，")) {
+                                val parts = newValue.split(",", "，")
+                                    .map { it.trim() }
+                                    .filter { it.isNotEmpty() }
+                                if (parts.isNotEmpty()) {
+                                    val existing = internalPrompt.split(",")
+                                        .map { it.trim() }
+                                        .filter { it.isNotEmpty() }
+                                        .toMutableList()
+                                    parts.forEach { p ->
+                                        if (!existing.contains(p)) existing.add(p)
+                                    }
+                                    val newPrompt = existing.joinToString(", ")
+                                    internalPrompt = newPrompt
+                                    onTagSelected(newPrompt)
+                                }
+                                customTagInput = ""
+                            } else {
+                                customTagInput = newValue
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text("自定义标签（逗号分隔可批量添加）") },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            imeAction = androidx.compose.ui.text.input.ImeAction.Done
+                        ),
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                            onDone = { addCustomTags() }
+                        )
+                    )
+                    FilledTonalIconButton(
+                        onClick = addCustomTags,
+                        enabled = customTagInput.isNotBlank()
+                    ) {
+                        Icon(Icons.Default.Add, "添加")
+                    }
+                }
+
                 Divider()
 
                 // 内容区域

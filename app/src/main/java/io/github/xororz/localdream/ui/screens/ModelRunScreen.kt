@@ -1635,53 +1635,19 @@ fun ModelRunScreen(
                             }
                         }
 
-                        var expandedPrompt by remember { mutableStateOf(false) }
-                        var expandedNegativePrompt by remember {
-                            mutableStateOf(
-                                false
-                            )
-                        }
-
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.Top
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            OutlinedTextField(
-                                value = prompt,
-                                onValueChange = onPromptChange,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable(
-                                        interactionSource = interactionSource,
-                                        indication = null
-                                    ) { },
-                                label = { Text(stringResource(R.string.image_prompt)) },
-                                maxLines = if (expandedPrompt) Int.MAX_VALUE else 2,
-                                minLines = if (expandedPrompt) 3 else 2,
-                                shape = MaterialTheme.shapes.medium,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                                ),
-                                trailingIcon = {
-                                    IconButton(onClick = {
-                                        expandedPrompt = !expandedPrompt
-                                    }) {
-                                        Icon(
-                                            if (expandedPrompt) Icons.Default.KeyboardArrowUp
-                                            else Icons.Default.KeyboardArrowDown,
-                                            contentDescription = if (expandedPrompt) "collapse" else "expand"
-                                        )
-                                    }
-                                }
+                            Text(
+                                stringResource(R.string.image_prompt),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Medium
                             )
-                            
                             FilledTonalIconButton(
                                 onClick = { showPromptSelector = true },
-                                modifier = Modifier
-                                    .padding(top = 8.dp)
-                                    .size(48.dp)
+                                modifier = Modifier.size(40.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Add,
@@ -1694,44 +1660,17 @@ fun ModelRunScreen(
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.Top
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            OutlinedTextField(
-                                value = negativePrompt,
-                                onValueChange = onNegativePromptChange,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable(
-                                        interactionSource = interactionSource,
-                                        indication = null
-                                    ) { },
-                                label = { Text(stringResource(R.string.negative_prompt)) },
-                                maxLines = if (expandedNegativePrompt) Int.MAX_VALUE else 2,
-                                minLines = if (expandedNegativePrompt) 3 else 2,
-                                shape = MaterialTheme.shapes.medium,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                                ),
-                                trailingIcon = {
-                                    IconButton(onClick = {
-                                        expandedNegativePrompt = !expandedNegativePrompt
-                                    }) {
-                                        Icon(
-                                            if (expandedNegativePrompt) Icons.Default.KeyboardArrowUp
-                                            else Icons.Default.KeyboardArrowDown,
-                                            contentDescription = if (expandedNegativePrompt) "collapse" else "expand"
-                                        )
-                                    }
-                                }
+                            Text(
+                                stringResource(R.string.negative_prompt),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Medium
                             )
-                            
                             FilledTonalIconButton(
                                 onClick = { showNegativePromptSelector = true },
-                                modifier = Modifier
-                                    .padding(top = 8.dp)
-                                    .size(48.dp)
+                                modifier = Modifier.size(40.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Add,
